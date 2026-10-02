@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teleprompter</title>
+<meta name="description" content="Voice-following teleprompter for iPad, Android and the web.">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Prompter">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ============ Library ============ -->
+<main id="library" class="view">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="18" rx="3"/><path d="M8 12h16M8 16h12M8 20h9"/></svg>
+      <h1>Teleprompter</h1>
+    </div>
+    <span class="plan-badge" data-plan></span>
+  </header>
+
+  <section class="actions">
+    <button class="btn primary" data-action="new">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New or paste script</button>
+    <label class="btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Import file
+      <input type="file" id="file-input" multiple hidden>
+    </label>
+  </section>
+  <p class="hint">Imports .txt, .rtf (TextEdit), .docx (Word, or Pages exported to Word), .md, .odt and .html. You can also drop files anywhere on this page.</p>
+
+  <section id="script-list" class="list" aria-live="polite"></section>
+
+  <footer class="foot">
+    <button class="link" data-action="export-library">Back up library</button>
+    <label class="link">Restore backup<input type="file" id="backup-input" accept=".json,application/json" hidden></label>
+    <span class="foot-note">Scripts are saved on this device.</span>
+  </footer>
+  <div class="dropzone" hidden><div>Drop to import</div></div>
+</main>
+
+<!-- ============ Editor ============ -->
+<main id="editor" class="view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" data-action="back" aria-label="Back to library">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <input id="title-input" class="title-input" placeholder="Script title" maxlength="120">
+    <button class="btn primary" data-action="prompt">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>Prompt</button>
+  </header>
+  <textarea id="body-input" class="body-input" placeholder="Paste or type your script here.&#10;&#10;Tip: put stage directions in [square brackets], like [PAUSE] or [SMILE]. They show as cues and voice follow skips them." spellcheck="true"></textarea>
+  <div class="editor-foot">
+    <span id="stats"></span>
+    <span class="spacer"></span>
+    <button class="link" data-action="share">Send to another device</button>
+    <button class="link" data-action="download">Download .txt</button>
+    <button class="link danger" data-action="delete">Delete</button>
+  </div>
+</main>
+
+<!-- ============ Prompter ============ -->
+<section id="prompter" class="prompter" hidden>
+  <div class="pr-stage"><div class="pr-text"></div></div>
+  <div class="pr-marker" aria-hidden="true"><i></i><i></i></div>
+  <div class="pr-countdown" hidden></div>
+  <div class="pr-progress"><span></span></div>
+
+  <div class="pr-bar">
+    <button class="icon-btn" data-action="exit" aria-label="Exit">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="seg" role="group" aria-label="Scroll mode">
+      <button data-mode="voice">Voice</button>
+      <button data-mode="auto">Auto</button>
+      <button data-mode="manual">Manual</button>
+    </div>
+    <span class="voice-dot" data-voice-state="off" title="Microphone"></span>
+    <span class="pr-heard" aria-live="off"></span>
+    <span class="spacer"></span>
+    <div class="pr-speed">
+      <button class="icon-btn" data-action="slower" aria-label="Slower"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <span><b data-speed-label></b> speed</span>
+      <button class="icon-btn" data-action="faster" aria-label="Faster"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <button class="icon-btn" data-action="smaller" aria-label="Smaller text"><span class="aa small">A</span></button>
+    <button class="icon-btn" data-action="bigger" aria-label="Larger text"><span class="aa">A</span></button>
+    <span class="timer" data-timer>0:00</span>
+    <button class="icon-btn" data-action="rewind" aria-label="Back to start">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+    <button class="icon-btn play" data-action="play" aria-label="Play">
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>
+      <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+    <button class="icon-btn" data-action="settings" aria-label="Display settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+  </div>
+
+  <form class="pr-settings" hidden>
+    <header><h2>Display</h2><button type="button" class="icon-btn" data-action="close-settings" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <label>Text size <output data-out="fontSize"></output>
+      <input type="range" name="fontSize" min="20" max="160" step="2"></label>
+    <label>Line spacing <output data-out="lineHeight"></output>
+      <input type="range" name="lineHeight" min="1" max="2.2" step="0.05"></label>
+    <label>Side margins <output data-out="margin"></output>
+      <input type="range" name="margin" min="0" max="30" step="1"></label>
+    <label>Reading line height on screen <output data-out="marker"></output>
+      <input type="range" name="marker" min="10" max="60" step="1"></label>
+    <label>Auto-scroll speed <output data-out="speed"></output>
+      <input type="range" name="speed" min="5" max="400" step="5"></label>
+    <div class="row">
+      <label>Colours
+        <select name="theme"><option value="dark">White on black</option><option value="amber">Yellow on black</option><option value="light">Black on white</option></select></label>
+      <label>Alignment
+        <select name="align"><option value="left">Left</option><option value="center">Centre</option></select></label>
+      <label>Countdown
+        <select name="countdown"><option value="0">Off</option><option value="3">3 s</option><option value="5">5 s</option></select></label>
+    </div>
+    <label class="check"><input type="checkbox" name="mirrorX"> Mirror left to right (beam-splitter glass)</label>
+    <label class="check"><input type="checkbox" name="mirrorY"> Flip upside down</label>
+    <label class="check"><input type="checkbox" name="dimRead"> Dim words already spoken</label>
+    <label>Speech language
+      <select name="lang">
+        <option value="">Device default</option>
+        <option value="en-US">English (US)</option><option value="en-CA">English (Canada)</option>
+        <option value="en-GB">English (UK)</option><option value="en-AU">English (Australia)</option>
+        <option value="fr-CA">Français (Canada)</option><option value="fr-FR">Français (France)</option>
+        <option value="es-ES">Español</option><option value="de-DE">Deutsch</option>
+      </select></label>
+    <p class="keys">Keyboard and Bluetooth remotes: Space play/pause, ↑↓ or Page Up/Down move, ←→ speed, M mirror, Esc exit. Tap the text to pause or resume.</p>
+  </form>
+</section>
+
+<!-- ============ Dialogs ============ -->
+<dialog id="share-dialog">
+  <form method="dialog">
+    <h2>Send to another device</h2>
+    <p>Open this link on your iPad or phone to add the script there. Send it by AirDrop, Messages or email.</p>
+    <textarea id="share-url" readonly rows="4"></textarea>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-action="copy-link">Copy link</button>
+      <button type="button" class="btn" data-action="native-share" hidden>Share…</button>
+      <button class="btn primary">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="incoming-dialog">
+  <form method="dialog">
+    <h2>Add shared script?</h2>
+    <p id="incoming-summary"></p>
+    <div class="dialog-actions">
+      <button class="btn" value="cancel">Not now</button>
+      <button class="btn primary" value="add">Add to library</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p>This can't be undone.</p>
+    <div class="dialog-actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn danger" value="ok">Delete</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

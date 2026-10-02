@@ -1,0 +1,9 @@
+{
+  "name": "madprompter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/matcher.test.mjs",
+    "start": "python3 -m http.server 8000 --directory app"
+  }
+}
