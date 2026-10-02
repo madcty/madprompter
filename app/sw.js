@@ -1,5 +1,5 @@
 // Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = "teleprompter-v3";
+const CACHE = "teleprompter-v4";
 const SHELL = [
   "./", "index.html", "css/app.css", "manifest.webmanifest", "icon.svg", "icon-192.png",
   "js/app.js", "js/store.js", "js/importers.js", "js/settings.js", "js/share.js",
