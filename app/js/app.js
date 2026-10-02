@@ -5,7 +5,10 @@ import { shareLink, decodeScript } from "./share.js";
 import { Prompter } from "./prompter.js";
 import { plan, limit } from "./plans.js";
 import { tokenize } from "./matcher.js";
-import { accountsEnabled, client, currentUser, onAuthChange, sendEmailLink, signInWith, signOut } from "./auth.js";
+import {
+  accountsEnabled, client, currentUser, onAuthChange, sendEmailLink, signInWith, signOut,
+  signInWithPassword, signUpWithPassword, sendPasswordReset, setPassword, friendlyError,
+} from "./auth.js";
 import { AUTH_PROVIDERS } from "./config.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -358,11 +361,23 @@ async function initAccounts() {
   if (!accountsEnabled()) return;
   for (const b of document.querySelectorAll("[data-provider]")) b.hidden = !AUTH_PROVIDERS.includes(b.dataset.provider);
   $("[data-provider-block=email]").hidden = !AUTH_PROVIDERS.includes("email");
+  // With no social buttons showing, "Or use your email" has nothing to be "or" to.
+  const social = AUTH_PROVIDERS.some((p) => p !== "email");
+  $("[data-or]").hidden = !social;
+  $("#signin-form").classList.toggle("email-only", !social);
 
   user = await currentUser();
   renderAccount();
   if (user) syncNow();
-  onAuthChange((u) => {
+  onAuthChange((u, event) => {
+    if (event === "PASSWORD_RECOVERY") {
+      // Arrived from a "reset password" email: ask for the new one right away.
+      user = u;
+      renderAccount();
+      openAccount("Choose a new password for your account.");
+      $("#new-password").focus();
+      return;
+    }
     const signedIn = !user && u;
     user = u;
     renderAccount();
@@ -375,36 +390,79 @@ async function initAccounts() {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) syncNow(); });
 }
 
+function openAccount(message) {
+  $("#account-summary").textContent = message || `Signed in as ${user?.email || "your account"}. Scripts sync automatically between every device where you're signed in.`;
+  $("#new-password").value = "";
+  if (!$("#account-dialog").open) $("#account-dialog").showModal();
+}
+
 $("#account-btn").addEventListener("click", () => {
-  if (user) {
-    $("#account-summary").textContent = `Signed in as ${user.email || "your account"}. Scripts sync automatically between every device where you're signed in.`;
-    $("#account-dialog").showModal();
-  } else {
-    $("#signin-dialog").showModal();
-  }
+  if (user) openAccount();
+  else $("#signin-dialog").showModal();
 });
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 $("#signin-dialog").addEventListener("click", async (e) => {
   const provider = e.target.closest("[data-provider]")?.dataset.provider;
   const action = e.target.closest("[data-action]")?.dataset.action;
+  if (!provider && !action) return;
+  const email = $("#signin-email").value.trim();
+  const password = $("#signin-password").value;
+  const needEmail = () => {
+    if (EMAIL_RE.test(email)) return true;
+    toast("Enter your email address.");
+    $("#signin-email").focus();
+    return false;
+  };
+  const needPassword = () => {
+    if (password.length >= 8) return true;
+    toast("Enter a password of at least 8 characters.");
+    $("#signin-password").focus();
+    return false;
+  };
   try {
     if (provider) {
       await signInWith(provider); // leaves the page and comes back signed in
+    } else if (action === "password-signin") {
+      if (!needEmail() || !needPassword()) return;
+      await signInWithPassword(email, password); // onAuthChange closes the dialog
+    } else if (action === "password-signup") {
+      if (!needEmail() || !needPassword()) return;
+      const ready = await signUpWithPassword(email, password);
+      if (!ready) {
+        $("#signin-dialog").close();
+        toast(`Check ${email} to confirm your account, then sign in.`, 8000);
+      }
     } else if (action === "email-link") {
-      const email = $("#signin-email").value.trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("Enter your email address.");
+      if (!needEmail()) return;
       await sendEmailLink(email);
       $("#signin-dialog").close();
       toast(`Check ${email} for a sign-in link. Open it on this device.`, 8000);
+    } else if (action === "forgot") {
+      if (!needEmail()) return;
+      await sendPasswordReset(email);
+      $("#signin-dialog").close();
+      toast(`Check ${email} for a link to choose a new password. Open it on this device.`, 8000);
     }
   } catch (err) {
-    toast(err.message || "Sign-in didn't work. Try again.");
+    toast(friendlyError(err), 8000);
   }
 });
 
 $("#account-dialog").addEventListener("click", async (e) => {
   const action = e.target.closest("[data-action]")?.dataset.action;
-  if (action === "sync-now") {
+  if (action === "set-password") {
+    const pw = $("#new-password").value;
+    if (pw.length < 8) return toast("Use a password of at least 8 characters.");
+    try {
+      await setPassword(pw);
+      $("#new-password").value = "";
+      toast("Password saved. On your other devices, sign in with your email and this password.", 7000);
+    } catch (err) {
+      toast(friendlyError(err), 7000);
+    }
+  } else if (action === "sync-now") {
     await syncNow({ quiet: false });
   } else if (action === "sign-out") {
     await syncNow();

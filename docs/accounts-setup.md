@@ -16,7 +16,13 @@ It creates `scripts` (one row per script, private to its owner by row-level secu
 - Site URL: `https://madcty.github.io/madprompter/`
 - Redirect URLs: add `https://madcty.github.io/madprompter/` and `http://localhost:8000/`
 
-Email sign-in links work as soon as this is done.
+Email sign-in links and email + password accounts work as soon as this is done.
+
+### Email limits
+Supabase's built-in mailer only sends a few emails per hour (sign-in links, confirmations, password resets).
+Password sign-in avoids email entirely after the account exists. Before opening sign-ups to customers, add your own
+mail service under **Project Settings > Authentication > SMTP Settings** (for example Resend or Postmark), then raise
+the limit under **Authentication > Rate Limits**.
 
 ## 4. Google sign-in
 1. https://console.cloud.google.com > create a project `madprompter`.
