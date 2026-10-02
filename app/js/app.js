@@ -5,6 +5,8 @@ import { shareLink, decodeScript } from "./share.js";
 import { Prompter } from "./prompter.js";
 import { plan, limit } from "./plans.js";
 import { tokenize } from "./matcher.js";
+import { accountsEnabled, client, currentUser, onAuthChange, sendEmailLink, signInWith, signOut } from "./auth.js";
+import { AUTH_PROVIDERS } from "./config.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const views = { library: $("#library"), editor: $("#editor") };
@@ -299,6 +301,127 @@ async function checkIncoming() {
   }
 }
 
+// ---------- accounts & sync ----------
+
+let user = null;
+let syncing = null;
+let syncState = "idle"; // idle | pending | error
+
+function renderAccount() {
+  const btn = $("#account-btn");
+  btn.hidden = !accountsEnabled();
+  btn.textContent = user ? (user.email || "Account") : "Sign in to sync";
+  btn.classList.toggle("primary", !user);
+  const note = $("#storage-note");
+  if (!user) {
+    note.textContent = accountsEnabled() ? "Scripts are saved on this device. Sign in to use them on your other devices." : "Scripts are saved on this device.";
+  } else {
+    const label = { idle: "Synced to your account", pending: "Syncing…", error: "Not synced yet, will retry" }[syncState];
+    note.innerHTML = `<span class="sync-dot ${syncState === "idle" ? "" : syncState}"></span>`;
+    note.append(label);
+  }
+}
+
+async function syncNow({ quiet = true } = {}) {
+  if (!user) return;
+  if (syncing) return syncing;
+  syncState = "pending";
+  renderAccount();
+  syncing = (async () => {
+    try {
+      const sb = await client();
+      if (!sb) throw new Error("offline");
+      const { pulled } = await store.sync(sb);
+      syncState = "idle";
+      if (pulled && !views.library.hidden) await renderLibrary();
+      if (!quiet) toast("Your scripts are up to date.");
+    } catch (err) {
+      syncState = "error";
+      if (!quiet) toast(navigator.onLine ? `Sync failed: ${err.message || err}` : "You're offline. Changes will sync when you reconnect.");
+    } finally {
+      syncing = null;
+      renderAccount();
+    }
+  })();
+  return syncing;
+}
+
+let syncTimer;
+store.onChange = () => {
+  if (!user) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 1500);
+};
+
+async function initAccounts() {
+  renderAccount();
+  if (!accountsEnabled()) return;
+  for (const b of document.querySelectorAll("[data-provider]")) b.hidden = !AUTH_PROVIDERS.includes(b.dataset.provider);
+  $("[data-provider-block=email]").hidden = !AUTH_PROVIDERS.includes("email");
+
+  user = await currentUser();
+  renderAccount();
+  if (user) syncNow();
+  onAuthChange((u) => {
+    const signedIn = !user && u;
+    user = u;
+    renderAccount();
+    if (signedIn) {
+      $("#signin-dialog").open && $("#signin-dialog").close();
+      syncNow().then(() => toast("Signed in. Your scripts now sync across your devices."));
+    }
+  });
+  window.addEventListener("online", () => syncNow());
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) syncNow(); });
+}
+
+$("#account-btn").addEventListener("click", () => {
+  if (user) {
+    $("#account-summary").textContent = `Signed in as ${user.email || "your account"}. Scripts sync automatically between every device where you're signed in.`;
+    $("#account-dialog").showModal();
+  } else {
+    $("#signin-dialog").showModal();
+  }
+});
+
+$("#signin-dialog").addEventListener("click", async (e) => {
+  const provider = e.target.closest("[data-provider]")?.dataset.provider;
+  const action = e.target.closest("[data-action]")?.dataset.action;
+  try {
+    if (provider) {
+      await signInWith(provider); // leaves the page and comes back signed in
+    } else if (action === "email-link") {
+      const email = $("#signin-email").value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("Enter your email address.");
+      await sendEmailLink(email);
+      $("#signin-dialog").close();
+      toast(`Check ${email} for a sign-in link. Open it on this device.`, 8000);
+    }
+  } catch (err) {
+    toast(err.message || "Sign-in didn't work. Try again.");
+  }
+});
+
+$("#account-dialog").addEventListener("click", async (e) => {
+  const action = e.target.closest("[data-action]")?.dataset.action;
+  if (action === "sync-now") {
+    await syncNow({ quiet: false });
+  } else if (action === "sign-out") {
+    await syncNow();
+    if (syncState === "error") {
+      toast("Some changes haven't synced yet. Reconnect to the internet before signing out.", 7000);
+      return;
+    }
+    await signOut();
+    user = null;
+    store.clear();
+    $("#account-dialog").close();
+    await renderLibrary();
+    renderAccount();
+    toast("Signed out. Scripts were removed from this device and are safe in your account.");
+  }
+});
+
 // ---------- prompter ----------
 
 const prompter = new Prompter($("#prompter"), {
@@ -331,12 +454,13 @@ async function seedSample() {
   let seeded = false;
   try { seeded = localStorage.getItem("tp.seeded") === "1"; } catch {}
   if (seeded || (await store.list()).length) return;
-  await store.create({ title: "Sample: try voice follow", body: SAMPLE });
+  await store.create({ title: "Sample: try voice follow", body: SAMPLE, sample: true });
   try { localStorage.setItem("tp.seeded", "1"); } catch {}
 }
 
 await seedSample();
 renderLibrary();
+initAccounts();
 checkIncoming();
 window.addEventListener("hashchange", checkIncoming);
 

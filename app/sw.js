@@ -1,9 +1,9 @@
 // Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = "teleprompter-v1";
+const CACHE = "teleprompter-v3";
 const SHELL = [
   "./", "index.html", "css/app.css", "manifest.webmanifest", "icon.svg", "icon-192.png",
   "js/app.js", "js/store.js", "js/importers.js", "js/settings.js", "js/share.js",
-  "js/prompter.js", "js/plans.js", "js/matcher.js", "js/voice.js",
+  "js/prompter.js", "js/plans.js", "js/matcher.js", "js/voice.js", "js/config.js", "js/auth.js",
 ];
 
 self.addEventListener("install", (e) => {
