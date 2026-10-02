@@ -5,7 +5,8 @@ Android tablet/phone. Voice follow listens as you read and keeps your line on th
 
 - `app/` the web app (static, no build step, installable as a PWA). See [app/README.md](app/README.md).
 - `docs/feature-spec.md` feature research (PromptSmart, CloudPrompter), roadmap and subscription tiers.
-- `tests/` unit tests for the speech-to-script matcher: `npm test`.
+- `supabase/schema.sql` database tables for accounts and synced scripts; setup steps in [docs/accounts-setup.md](docs/accounts-setup.md).
+- `tests/` unit tests for the speech matcher and script sync: `npm test`.
 
 ## Hosting
 `.github/workflows/pages.yml` publishes `app/` to GitHub Pages on every push to `main`.
